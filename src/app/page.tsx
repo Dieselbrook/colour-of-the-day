@@ -1,195 +1,175 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
-const COLOUR_POOL = [
-  { name: "Ocean Blue", hex: "#0077B6", mood: "calm & collected" },
-  { name: "Sunset Orange", hex: "#F77F00", mood: "fired up" },
-  { name: "Emerald Green", hex: "#2DC653", mood: "growth mode" },
-  { name: "Royal Purple", hex: "#7B2D8E", mood: "mysterious energy" },
-  { name: "Hot Pink", hex: "#FF006E", mood: "unapologetically bold" },
-  { name: "Golden Yellow", hex: "#FFD60A", mood: "pure sunshine" },
-  { name: "Cherry Red", hex: "#D90429", mood: "passion unleashed" },
-  { name: "Electric Teal", hex: "#00F5D4", mood: "future vibes" },
-  { name: "Coral", hex: "#FF7F7F", mood: "soft & warm" },
-  { name: "Midnight Indigo", hex: "#3A0CA3", mood: "deep thinker" },
-];
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
+interface ColourCard {
+  name: string;
+  mood: string;
+  hex: string;
 }
 
-type Phase = "button" | "picking" | "loading" | "joke";
+const COLOUR_POOL: ColourCard[] = [
+  { name: "Ocean Blue", mood: "calm & collected", hex: "#0077B6" },
+  { name: "Sunset Orange", mood: "fired up", hex: "#F77F00" },
+  { name: "Emerald Green", mood: "growth mode", hex: "#2D6A4F" },
+  { name: "Royal Purple", mood: "creative genius", hex: "#7B2D8E" },
+  { name: "Golden Yellow", mood: "pure sunshine", hex: "#F4A100" },
+  { name: "Cherry Red", mood: "bold & fearless", hex: "#D00000" },
+  { name: "Coral Pink", mood: "warm & fuzzy", hex: "#FF6B6B" },
+  { name: "Midnight Navy", mood: "deep thinker", hex: "#1B2845" },
+  { name: "Electric Teal", mood: "buzzing with ideas", hex: "#00B4D8" },
+  { name: "Lavender", mood: "peaceful vibes", hex: "#B388EB" },
+  { name: "Sage Green", mood: "grounded & steady", hex: "#87A878" },
+  { name: "Hot Magenta", mood: "main character energy", hex: "#FF006E" },
+  { name: "Burnt Sienna", mood: "cozy & nostalgic", hex: "#C1440E" },
+  { name: "Sky Blue", mood: "limitless", hex: "#89CFF0" },
+  { name: "Forest Green", mood: "back to basics", hex: "#1B4332" },
+  { name: "Copper", mood: "resourceful & sharp", hex: "#B87333" },
+  { name: "Blush", mood: "soft power", hex: "#DE6FA1" },
+  { name: "Slate Grey", mood: "focused & efficient", hex: "#708090" },
+  { name: "Tangerine", mood: "unstoppable", hex: "#FF9505" },
+  { name: "Indigo", mood: "visionary mode", hex: "#3F37C9" },
+];
+
+function pickRandom(pool: ColourCard[], count: number): ColourCard[] {
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
 
 export default function Home() {
-  const [phase, setPhase] = useState<Phase>("button");
-  const [colours, setColours] = useState<typeof COLOUR_POOL>([]);
-  const [selected, setSelected] = useState<number[]>([]);
+  const [stage, setStage] = useState<"button" | "pick" | "loading" | "joke">("button");
+  const [colours, setColours] = useState<ColourCard[]>([]);
+  const [selected, setSelected] = useState<ColourCard[]>([]);
   const [joke, setJoke] = useState("");
 
-  const start = useCallback(() => {
-    setColours(shuffle(COLOUR_POOL).slice(0, 5));
+  const handlePress = useCallback(() => {
+    setColours(pickRandom(COLOUR_POOL, 5));
     setSelected([]);
     setJoke("");
-    setPhase("picking");
+    setStage("pick");
   }, []);
 
-  const toggle = (i: number) => {
-    setSelected((prev) => {
-      if (prev.includes(i)) return prev.filter((x) => x !== i);
-      if (prev.length >= 2) return prev;
-      return [...prev, i];
-    });
-  };
+  const handleSelect = useCallback(
+    async (card: ColourCard) => {
+      if (stage !== "pick") return;
 
-  const getJoke = async () => {
-    const c1 = colours[selected[0]];
-    const c2 = colours[selected[1]];
-    setPhase("loading");
-    try {
-      const res = await fetch("/api/joke", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          colour1: `${c1.name} (${c1.mood})`,
-          colour2: `${c2.name} (${c2.mood})`,
-        }),
-      });
-      const data = await res.json();
-      setJoke(data.joke || "Couldn't think of one... I'm feeling a bit colourblind today.");
-    } catch {
-      setJoke("Something went wrong... guess the colours clashed!");
-    }
-    setPhase("joke");
-  };
+      const alreadySelected = selected.find((s) => s.name === card.name);
+      if (alreadySelected) {
+        setSelected(selected.filter((s) => s.name !== card.name));
+        return;
+      }
 
-  const reset = () => {
-    setPhase("button");
+      const next = [...selected, card];
+      setSelected(next);
+
+      if (next.length === 2) {
+        setStage("loading");
+        try {
+          const res = await fetch("/api/joke", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              colour1: next[0].name,
+              colour2: next[1].name,
+              mood1: next[0].mood,
+              mood2: next[1].mood,
+            }),
+          });
+          const data = await res.json();
+          setJoke(data.joke);
+          setStage("joke");
+        } catch {
+          setJoke("Couldn't think of a joke... guess my humour is feeling a bit grey today 😅");
+          setStage("joke");
+        }
+      }
+    },
+    [stage, selected]
+  );
+
+  const reset = useCallback(() => {
+    setStage("button");
     setColours([]);
     setSelected([]);
     setJoke("");
-  };
+  }, []);
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
-      <AnimatePresence mode="wait">
-        {phase === "button" && (
-          <motion.div
-            key="button"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.5, opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="flex flex-col items-center gap-6"
-          >
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight text-center">
-              Colour of the Day
-            </h1>
-            <p className="text-zinc-400 text-lg">What&apos;s your vibe?</p>
-            <button
-              onClick={start}
-              className="w-40 h-40 rounded-full bg-red-500 hover:bg-red-400 active:scale-95 transition-all shadow-[0_0_60px_rgba(239,68,68,0.4)] hover:shadow-[0_0_80px_rgba(239,68,68,0.6)] text-white font-bold text-xl"
-            >
-              TAP ME
-            </button>
-          </motion.div>
-        )}
+      <h1 className="text-2xl md:text-4xl font-bold mb-2 tracking-tight text-center">
+        Colour of the Day
+      </h1>
+      <p className="text-zinc-500 mb-12 text-center text-sm md:text-base">
+        {stage === "button" && "Press the button to discover your vibe"}
+        {stage === "pick" && "Pick 2 colours that speak to you"}
+        {stage === "loading" && "Brewing a dad joke..."}
+        {stage === "joke" && "Your colours have spoken 🎨"}
+      </p>
 
-        {phase === "picking" && (
-          <motion.div
-            key="picking"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.4 }}
-            className="flex flex-col items-center gap-8 w-full max-w-2xl"
-          >
-            <h2 className="text-2xl md:text-3xl font-bold text-center">Pick 2 colours</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full">
-              {colours.map((c, i) => {
-                const isSelected = selected.includes(i);
-                return (
-                  <motion.button
-                    key={c.name}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.08 }}
-                    onClick={() => toggle(i)}
-                    className={`rounded-2xl p-5 text-left transition-all border-2 ${
-                      isSelected
-                        ? "border-white scale-105 shadow-lg"
-                        : "border-transparent hover:border-zinc-600"
-                    }`}
-                    style={{ backgroundColor: c.hex + "22" }}
-                  >
-                    <div
-                      className="w-10 h-10 rounded-full mb-3 shadow-md"
-                      style={{ backgroundColor: c.hex }}
-                    />
-                    <div className="font-bold text-sm" style={{ color: c.hex }}>
-                      {c.name}
-                    </div>
-                    <div className="text-zinc-400 text-xs mt-1">{c.mood}</div>
-                  </motion.button>
-                );
-              })}
-            </div>
-            <button
-              disabled={selected.length !== 2}
-              onClick={getJoke}
-              className="mt-2 px-8 py-3 rounded-full bg-white text-black font-bold text-lg disabled:opacity-30 disabled:cursor-not-allowed hover:bg-zinc-200 transition-all"
-            >
-              Get My Joke →
-            </button>
-          </motion.div>
-        )}
+      {/* BIG RED BUTTON */}
+      {stage === "button" && (
+        <button
+          onClick={handlePress}
+          className="pulse-glow w-40 h-40 md:w-52 md:h-52 rounded-full bg-red-600 hover:bg-red-500 transition-colors text-white font-bold text-xl md:text-2xl cursor-pointer select-none"
+        >
+          PRESS ME
+        </button>
+      )}
 
-        {phase === "loading" && (
-          <motion.div
-            key="loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex flex-col items-center gap-4"
-          >
-            <div className="w-12 h-12 border-4 border-zinc-600 border-t-white rounded-full animate-spin" />
-            <p className="text-zinc-400">Cooking up a dad joke...</p>
-          </motion.div>
-        )}
+      {/* COLOUR CARDS */}
+      {(stage === "pick" || stage === "loading" || stage === "joke") && (
+        <div className="flex flex-wrap justify-center gap-4 max-w-2xl">
+          {colours.map((card, i) => {
+            const isSelected = selected.some((s) => s.name === card.name);
+            const isDimmed = stage !== "pick" && !isSelected;
+            return (
+              <button
+                key={card.name}
+                onClick={() => handleSelect(card)}
+                disabled={stage !== "pick"}
+                className="fade-in-up rounded-2xl p-5 w-36 md:w-40 text-center transition-all duration-300 cursor-pointer disabled:cursor-default"
+                style={{
+                  animationDelay: `${i * 100}ms`,
+                  opacity: 0,
+                  backgroundColor: card.hex,
+                  transform: isSelected ? "scale(1.1)" : "scale(1)",
+                  filter: isDimmed ? "brightness(0.4)" : "brightness(1)",
+                  border: isSelected ? "3px solid white" : "3px solid transparent",
+                }}
+              >
+                <div className="font-bold text-white text-sm md:text-base drop-shadow-lg">
+                  {card.name}
+                </div>
+                <div className="text-white/80 text-xs mt-1 drop-shadow">
+                  {card.mood}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-        {phase === "joke" && (
-          <motion.div
-            key="joke"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, type: "spring" }}
-            className="flex flex-col items-center gap-8 max-w-lg text-center"
+      {/* LOADING */}
+      {stage === "loading" && (
+        <div className="mt-10 text-zinc-400 animate-pulse text-lg">
+          🤔 Thinking...
+        </div>
+      )}
+
+      {/* JOKE */}
+      {stage === "joke" && (
+        <div className="mt-10 max-w-md text-center fade-in">
+          <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+            <p className="text-lg md:text-xl leading-relaxed">{joke}</p>
+          </div>
+          <button
+            onClick={reset}
+            className="mt-6 px-6 py-3 rounded-full bg-zinc-800 hover:bg-zinc-700 transition-colors font-medium cursor-pointer"
           >
-            <div className="flex gap-3">
-              {selected.map((i) => (
-                <div
-                  key={i}
-                  className="w-8 h-8 rounded-full shadow-md"
-                  style={{ backgroundColor: colours[i].hex }}
-                />
-              ))}
-            </div>
-            <p className="text-2xl md:text-3xl font-bold leading-relaxed">{joke}</p>
-            <button
-              onClick={reset}
-              className="px-8 py-3 rounded-full border-2 border-zinc-600 hover:border-white font-bold transition-all"
-            >
-              Go Again 🎨
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            Go Again 🔄
+          </button>
+        </div>
+      )}
     </main>
   );
 }

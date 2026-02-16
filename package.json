@@ -35,7 +35,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/Dieselbrook/colour-of-the-day/issues"
   },

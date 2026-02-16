@@ -1,38 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
-    const { colour1, colour2 } = await req.json();
-
-    if (!colour1 || !colour2) {
-      return NextResponse.json({ error: "Need 2 colours" }, { status: 400 });
-    }
+    const { colour1, colour2, mood1, mood2 } = await req.json();
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 1,
       max_tokens: 150,
+      temperature: 1,
       messages: [
         {
           role: "system",
           content:
-            "You are a dad joke comedian. Given two colours with their mood/energy descriptions, write ONE short, punny dad joke that combines both colours. Keep it family-friendly, groan-worthy, and under 2 sentences. Return ONLY the joke, nothing else.",
+            "You are a dad joke generator. Given two colours and their mood descriptions, generate ONE short, punny dad joke that cleverly combines both colours. Keep it clean, wholesome, and groan-worthy. Return ONLY the joke text, nothing else.",
         },
         {
           role: "user",
-          content: `Colour 1: ${colour1}\nColour 2: ${colour2}`,
+          content: `Colour 1: ${colour1} (${mood1})\nColour 2: ${colour2} (${mood2})`,
         },
       ],
     });
 
-    const joke = completion.choices[0]?.message?.content?.trim() || "I'm drawing a blank... must be colour-blind!";
+    const joke = completion.choices[0]?.message?.content?.trim() || "I'm drawing a blank... must be running low on colour-ful ideas!";
 
     return NextResponse.json({ joke });
-  } catch (e) {
-    console.error("Joke API error:", e);
-    return NextResponse.json({ joke: "My joke generator is feeling blue... try again!" }, { status: 500 });
+  } catch (error) {
+    console.error("Joke API error:", error);
+    return NextResponse.json(
+      { joke: "My joke machine broke... it's feeling a bit blue 😅" },
+      { status: 500 }
+    );
   }
 }
